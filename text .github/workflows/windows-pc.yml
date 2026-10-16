@@ -1,0 +1,59 @@
+name: Custom Windows Virtual PC
+
+on: 
+  workflow_dispatch: # Allows manual UI execution trigger
+
+jobs:
+  deploy-virtual-machine:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Initialize Environment Layout
+      uses: actions/checkout@v4
+
+    - name: Download and Configure Ngrok Binary
+      run: |
+        curl -s https://amazonaws.com | sudo tee /etc/keyrings/ngrok.asc >/dev/null
+        echo "deb [signed-by=/etc/keyrings/ngrok.asc] https://amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+        sudo apt-get update && sudo apt-get install ngrok -y
+
+    - name: Inject Tunnel Authentication Credentials
+      run: ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: Initialize Isolated Windows OS Container
+      run: |
+        # Dedicate storage directories out of standard Docker root paths
+        sudo mkdir -p /tmp/docker-data
+        sudo chown -R $USER:$USER /tmp/docker-data
+        
+        # Spin up the specialized container using virtual machine drivers
+        docker run -d --name windows_instance \
+          -p 8006:8006 \
+          --device /dev/kvm \
+          --cap-add NET_ADMIN \
+          -e VERSION="10" \
+          -e RAM_SIZE="6G" \
+          -e CPU_CORES="2" \
+          dockurr/windows
+
+    - name: Expose Browser Interface and Keep-Alive Host
+      run: |
+        echo "=========================================================="
+        echo "CONNECTING PROXY CONNECTION TUNNEL..."
+        echo "=========================================================="
+        
+        # Open an asynchronous network mapping tunnel pointing at port 8006
+        ngrok http 8006 --log=stdout &
+        
+        # Sleep short interval ensuring validation checks clear on server
+        sleep 6
+        
+        # Output the live secure web portal string
+        curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+        
+        echo "=========================================================="
+        echo "VIRTUAL PC ACTIVE. REFRESH ACTIVE WORKFLOW FOR STABILITY."
+        echo "=========================================================="
+        
+        # Standard sleep keeps the host machine script execution active up to maximum 6 hrs
+        sleep 21600
