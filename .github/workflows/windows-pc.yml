@@ -1,7 +1,7 @@
 name: Custom Windows Virtual PC
 
 on: 
-  workflow_dispatch: # Allows manual UI execution trigger
+  workflow_dispatch: # मैन्युअल रूप से चालू करने के लिए
 
 jobs:
   deploy-virtual-machine:
@@ -22,14 +22,13 @@ jobs:
 
     - name: Initialize Isolated Windows OS Container
       run: |
-        # Dedicate storage directories out of standard Docker root paths
+        # स्टोरेज डायरेक्टरी बनाना
         sudo mkdir -p /tmp/docker-data
         sudo chown -R $USER:$USER /tmp/docker-data
         
-        # Spin up the specialized container using virtual machine drivers
+        # बिना KVM बाधा के विंडोज कंटेनर को बैकग्राउंड में रन करना
         docker run -d --name windows_instance \
           -p 8006:8006 \
-          --device /dev/kvm \
           --cap-add NET_ADMIN \
           -e VERSION="10" \
           -e RAM_SIZE="6G" \
@@ -42,18 +41,18 @@ jobs:
         echo "CONNECTING PROXY CONNECTION TUNNEL..."
         echo "=========================================================="
         
-        # Open an asynchronous network mapping tunnel pointing at port 8006
+        # पोर्ट 8006 के लिए ngrok टनल चालू करना
         ngrok http 8006 --log=stdout &
         
-        # Sleep short interval ensuring validation checks clear on server
-        sleep 6
+        # टनल एक्टिव होने के लिए थोड़ा रुकना
+        sleep 12
         
-        # Output the live secure web portal string
-        curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+        # आपका लाइव विंडोज पीसी यूआरएल प्रिंट करना
+        curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels.public_url'
         
         echo "=========================================================="
-        echo "VIRTUAL PC ACTIVE. REFRESH ACTIVE WORKFLOW FOR STABILITY."
+        echo "VIRTUAL PC ACTIVE. COPY THE URL ABOVE TO OPEN WINDOWS."
         echo "=========================================================="
         
-        # Standard sleep keeps the host machine script execution active up to maximum 6 hrs
+        # रनर को 6 घंटे तक चालू रखना
         sleep 21600
